@@ -2,10 +2,7 @@ from itertools import product as prod
 import numpy as np
 import math
 import cmath
-import time
-from scipy.optimize import minimize
 import matplotlib.pyplot as plt
-from qutip import *
 
 Pi = math.pi
 
