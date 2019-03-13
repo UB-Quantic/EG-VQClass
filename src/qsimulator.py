@@ -6,39 +6,39 @@ import matplotlib.pyplot as plt
 
 Pi = math.pi
 
+def ii(i):
+    """Computes the double index.
+    
+    Args.
+        i (vector): array of bits with value 1 or 0.
+
+    Ret.
+        ii (int): base 10 representation of the bits array.
+    """
+    l = len(i)
+    return np.dot(i,[2**(l-j-1) for j in range(l)])
+
+ 
+
+
 class QC(object):
 
-    def __init__(self, qubits, blocks):
+    def __init__(self, qubits):
         self.size = qubits
-        self.depth = blocks
-        self.fullness = np.zeros(self.depth)
         """
         The quantum state is initialized with all qubits at 0.
         """
-        self.state = np.zeros(2**self.size, dtype=complex)
+        self.state = [0]*2**self.size
         self.state[0] = 1.
 
     def initialize(self):
         """Brings the state vector back to its initial state.
         """
-        self.state = np.zeros(2**self.size, dtype=complex)
+        self.state = [0]*2**self.size
         self.state[0] = 1.
-        self.fullness = np.zeros(self.depth)
 
 
-    def ii (self,i):
-        """Computes the double index.
-
-        Args.
-            i (vector): array of bits with value 1 or 0.
-
-        Ret.
-            ii (int): base 10 representation of the bits array.
-        """
-        l = len(i)
-        return np.dot(i,[2**(l-j-1) for j in range(l)])
-
-
+    
     ###############################
     # 1-Qubit Gates
     ###############################
@@ -50,15 +50,19 @@ class QC(object):
         Args.
             m (int): the qubit we apply our gate on.
         """
+        if i>=self.size: raise ValueError('Qubit does not exist.')
+        for i in range(2**(self.size-1)):
+            I = 2*i-i%(2**m)
+            J = I+2**m
+            self.state[I], self.state[J] = (
+
         for i in prod([0,1], repeat=self.size):
-            j = np.array(i)
+            j = i.copy()
             j[m] ^= 1
             if(i[m]):
-                self.state[self.ii(i)]= (
-                    self.state[self.ii(j)]-2*self.state[self.ii(i)]
-                )
+                self.state[ii(i)]=self.state[ii(j)]-2*self.state[ii(i)]
             else:
-                self.state[self.ii(i)]+=self.state[self.ii(j)]
+                self.state[ii(i)]+=self.state[ii(j)]
         self.state /= math.sqrt(2)
 
     def x(self, m):
@@ -342,10 +346,7 @@ class QC(object):
         Rets.
             success (int): indicates whether some error flag was raised.
         """
-        if (self.fullness[position]):
-            print("There is already a block in this position.")
-            return 1
-        
+       
         if(typ not in 'abcdxy'):
             print("Wrong key for type.")
             return 1
