@@ -50,37 +50,31 @@ class QC(object):
         Args.
             m (int): the qubit we apply our gate on.
         """
-        if i>=self.size: raise ValueError('Qubit does not exist.')
+        s = 1/np.sqrt(2)
+        if m>=self.size: raise ValueError('Qubit does not exist.')
         for i in range(2**(self.size-1)):
             I = 2*i-i%(2**m)
             J = I+2**m
-            self.state[I], self.state[J] = (
-
-        for i in prod([0,1], repeat=self.size):
-            j = i.copy()
-            j[m] ^= 1
-            if(i[m]):
-                self.state[ii(i)]=self.state[ii(j)]-2*self.state[ii(i)]
-            else:
-                self.state[ii(i)]+=self.state[ii(j)]
-        self.state /= math.sqrt(2)
+            a = s*self.state[I] + s*self.state[J]
+            b = s*self.state[I] - s*self.state[J]
+            self.state[I] = a
+            self.state[J] = b
 
     def x(self, m):
         """Apply the X Pauli Gate on the m'th qubit.
 
         Args.
             m (int): the qubit we apply our gate on.
-        """        
-        for i in prod([0,1], repeat=self.size):
-            j = np.array(i)
-            j[m] ^= 1
-            if(i[m]):
-                self.state[self.ii(i)], self.state[self.ii(j)] = (
-                    self.state[self.ii(j)],
-                    self.state[self.ii(i)]
-                )
-                
-    def y(self, m):
+        """
+        if m>=self.size: raise ValueError('Qubit does not exist.')
+        for i in range(2**(self.size-1)):
+            I = 2*i-i%(2**m)
+            J = I+2**m
+            a = self.state[I]
+            self.state[I] = self.state[J]
+            self.state[J] = a
+
+   def y(self, m):
         """Apply the Y Pauli Gate on the m'th qubit.
         
         Args.
@@ -359,3 +353,21 @@ class QC(object):
             'x': self.blockx(angles, qubits),
             'y': self.blocky(angles, qubits)
         }.get(typ, 1)
+
+
+import time
+
+hola = QC(4)
+inici1 = time.time()
+for i in range(4):
+    hola.x(i)
+print(hola.state)
+final1 = time.time()
+print("temps 1 = ", final1-inici1)
+hola.initialize()
+inici2 = time.time()
+for i in range(4):
+    hola.x2(i)
+print(hola.state)
+final2 = time.time()
+print("temps 2 = ", final2-inici2)
