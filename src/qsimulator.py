@@ -1,24 +1,8 @@
-from itertools import product as prod
 import numpy as np
 import math
 import cmath
-import matplotlib.pyplot as plt
 
 Pi = math.pi
-
-def ii(i):
-    """Computes the double index.
-    
-    Args.
-        i (vector): array of bits with value 1 or 0.
-
-    Ret.
-        ii (int): base 10 representation of the bits array.
-    """
-    l = len(i)
-    return np.dot(i,[2**(l-j-1) for j in range(l)])
-
- 
 
 
 class QC(object):
@@ -211,7 +195,7 @@ class QC(object):
         for i in range(2**(self.size-2)):
             I = (2**c + i%2**c + ((i-i%2**c)*2)%2**t + 2*((i-i%2**c)*2 -
                  ((2*(i-i%2**c))%2**t)) + 2**t)
-            self.state[I] -= 1
+            self.state[I] *= -1
 
     def swap(self, m, n):
         """Apply a SWAP gate.
@@ -370,27 +354,3 @@ class QC(object):
             'x': self.blockx(angles, qubits),
             'y': self.blocky(angles, qubits)
         }.get(typ, 1)
-
-
-import time
-
-hola = QC(4)
-inici1 = time.time()
-for i in range(4):
-    hola.h(i)
-hola.state=list(range(16))
-hola.cnot(0,1)
-#hola.cnot(2,3)
-print(hola.state)
-final1 = time.time()
-print("temps 1 = ", final1-inici1)
-hola.initialize()
-inici2 = time.time()
-for i in range(4):
-    hola.h(i)
-hola.state=list(range(16))
-hola.cnot2(0,1)
-#hola.cnot2(2,3)
-print(hola.state)
-final2 = time.time()
-print("temps 2 = ", final2-inici2)
