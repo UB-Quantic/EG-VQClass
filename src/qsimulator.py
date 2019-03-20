@@ -215,7 +215,9 @@ class QC(object):
     ############################################
     # Circuits
     ############################################
-    
+   
+
+   # The following were created for classification using 4-qubits 
     def encode(self, point):
         """Creates the encoding layer.
         
@@ -354,3 +356,45 @@ class QC(object):
             'x': self.blockx(angles, qubits),
             'y': self.blocky(angles, qubits)
         }.get(typ, 1)
+
+
+    # The following are intended to be used with 1-qubit circuits.
+    def unitary(self, m, beta, gamma, delta):
+        """Apply an arbitrary unitary gate on the m'th qubit.
+        Every unitary gate is characterized by three angles.
+
+        Args.
+            m (int): qubit the gate is applied on.
+            beta (float): first angle.
+            gamma (float): second angle.
+            delta (float): third angle.
+        """
+        if m>=self.size: raise ValueError('Qubit does not exist.')
+        c = math.cos(0.5*gamma)
+        s = math.sin(0.5*gamma)
+        plus = cmath.exp(0.5j*(beta+delta))
+        minus = cmath.exp(0.5j*(beta-delta))
+        for i in range(2**(self.size-1)):
+            I = 2*i -i%(2**m)
+            J = I+2**m
+            a = c/plus*self.state[I] - s/minus*self.state[J]
+            b = s*minus*self.state[I] + c*plus*self.state[J]
+            self.state[I] = a
+            self.state[J] = b
+
+    def block(self, m, point, angles, style=0):
+        """Apply a learning block on the m'th qubit.
+
+        Args.
+            m (int): qubit the block is applied on.
+            point (dim=2 float): coordinates of input.
+            angles (dim=3 float): angles that determine a unitary gate.
+            style (int): customizes the block.
+        """
+        if m>=self.size: raise ValueError('Qubit does not exist.')
+        if style:
+            self.unitary(m, point[0]+angles[0], point[1]+angles[1], angles[2])
+        else:
+            self.ry(m, point[0]*0.5*Pi)
+            self.rz(m, (1+point[1])*Pi)
+            self.unitary(m, angles[0], angles[1], angles[2])
