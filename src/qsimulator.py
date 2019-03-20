@@ -359,7 +359,7 @@ class QC(object):
 
 
     # The following are intended to be used with 1-qubit circuits.
-    def unitary(self, m, beta, gamma, delta):
+    def unitary(self, m, theta, phi, lamb):
         """Apply an arbitrary unitary gate on the m'th qubit.
         Every unitary gate is characterized by three angles.
 
@@ -372,13 +372,13 @@ class QC(object):
         if m>=self.size: raise ValueError('Qubit does not exist.')
         c = math.cos(0.5*gamma)
         s = math.sin(0.5*gamma)
-        plus = cmath.exp(0.5j*(beta+delta))
-        minus = cmath.exp(0.5j*(beta-delta))
+        ephi = cmath.exp(1j*phi)
+        elamb = cmath.exp(1j*lamb)
         for i in range(2**(self.size-1)):
             I = 2*i -i%(2**m)
             J = I+2**m
-            a = c/plus*self.state[I] - s/minus*self.state[J]
-            b = s*minus*self.state[I] + c*plus*self.state[J]
+            a = c*self.state[I] - s*elamb*self.state[J]
+            b = s*ephi*self.state[I] + c*ephi*elamb*self.state[J]
             self.state[I] = a
             self.state[J] = b
 
