@@ -74,41 +74,41 @@ class QC(object):
             self.state[I] = self.state[J]
             self.state[J] = a
 
-   def y(self, m):
+    def y(self, m):
         """Apply the Y Pauli Gate on the m'th qubit.
         
         Args.
             m (int): the qubit we apply our gate on.
         """
-        for i in prod([0,1], repeat=self.size):
-            j = np.array(i)
-            j[m] ^= 1
-            if(i[m]):
-                self.state[self.ii(i)], self.state[self.ii(j)] = (
-                    self.state[self.ii(j)],
-                    -self.state[self.ii(i)]
-                )
-        self.state *= 1.j
-        
+        if m>=self.size: raise ValueError('Qubit does not exist.')
+        for i in range(2**(self.size-1)):
+            I = 2*i -i%(2**m)
+            J = I+2**m
+            a = -1.j * self.state[I]
+            self.state[I] = 1.j*self.state[J]
+            self.state[J] = a
+
     def z(self, m):
         """Apply the Z Pauli Gate on the m'th qubit.
         
         Args.
             m (int): the qubit we apply our gate on.
         """
-        for i in prod([0,1], repeat=self.size):
-            if(i[m]):
-                self.state[self.ii(i)] *= -1
-    
+        if m>=self.size: raise ValueError('Qubit does not exist.')
+        for i in range(2**(self.size-1)):
+            J = 2*i - i%(2**m) + 2**m
+            self.state[J] *= -1
+
     def s(self, m):
         """Apply the Phase Gate on the m'th qubit.
         
         Args.
             m (int): the qubit we apply our gate on.
         """
-        for i in prod([0,1], repeat=self.size):
-            if(i[m]):
-                self.state[self.ii(i)] *= 1.j
+        if m>=self.size: raise ValueError('Qubit does not exist.')
+        for i in range(2**(self.size-1)):
+            J = 2*i - i%(2**m) + 2**m
+            self.state[J] *= 1.j
                 
     def t(self, m):
         """Apply the pi/8 Gate on the m'th qubit.
@@ -116,11 +116,12 @@ class QC(object):
         Args.
             m (int): the qubit we apply our gate on.
         """
+        if m>=self.size: raise ValueError('Qubit does not exist.')
         aux = cmath.exp(0.25j*math.pi)
-        for i in prod([0,1], repeat=self.size):
-            if(i[m]):
-                self.state[self.ii(i)] *= aux
-                
+        for i in range(2**(self.size-1)):
+            J = 2*i - i%(2**m) + 2**m
+            self.state[J] *= aux
+               
     def rx(self, m, th):
         """Apply a x-rotation on the m'th qubit.
         
@@ -128,17 +129,18 @@ class QC(object):
             m (int): the qubit we apply our gate on.
             th (float): angle we rotate.
         """
-        c = math.cos(th / 2)
-        s = -1.j * math.sin(th / 2) # beware of conventions
-        for i in prod([0,1], repeat=self.size):
-            j = np.array(i)
-            j[m] ^= 1
-            if(i[m]):
-                self.state[self.ii(i)],self.state[self.ii(j)] = (
-                    s*self.state[self.ii(j)] + c*self.state[self.ii(i)],
-                    c*self.state[self.ii(j)] + s*self.state[self.ii(i)]
-                )
-    
+        if m>=self.size: raise ValueError('Qubit does not exist.')
+        th2 = 0.5*th
+        c = math.cos(th2)
+        s = -1.j * math.sin(th2) # beware of conventions
+        for i in range(2**(self.size-1)):
+            I = 2*i - i%2**m
+            J = I + 2**m
+            a = c*self.state[I] + s*self.state[J]
+            b = s*self.state[I] + c*self.state[J]
+            self.state[I] = a
+            self.state[J] = b
+        
     def ry(self, m, th):
         """Apply a y-rotation on the m'th qubit.
         
@@ -146,18 +148,18 @@ class QC(object):
             m (int): the qubit we apply our gate on.
             th (float): angle we rotate.
         """
-        c = math.cos(th / 2)
-        s = math.sin(th / 2) 
-        for i in prod([0,1], repeat=self.size):
-            j = np.array(i)
-            j[m] ^= 1
-            if(i[m]):
-                self.state[self.ii(i)],self.state[self.ii(j)] = (
-                    s*self.state[self.ii(j)] + c*self.state[self.ii(i)],
-                    c*self.state[self.ii(j)] - s*self.state[self.ii(i)]
-                )
-                # beware of conventions
-                
+        if m>=self.size: raise ValueError('Qubit does not exist.')
+        th2 = 0.5*th
+        c = math.cos(th2)
+        s = math.sin(th2) # beware of conventions
+        for i in range(2**(self.size-1)):
+            I = 2*i - i%2**m
+            J = I + 2**m
+            a = c*self.state[I] - s*self.state[J]
+            b = s*self.state[I] + c*self.state[J]
+            self.state[I] = a
+            self.state[J] = b
+        
     def rz(self, m, th):
         """Apply a z-rotation on the m'th qubit.
         
@@ -165,13 +167,14 @@ class QC(object):
             m (int): the qubit we apply our gate on.
             th (float): angle we rotate.
         """
-        aux = cmath.exp(0.5j*th)
-        for i in prod([0,1], repeat=self.size):
-            if(i[m]):
-                self.state[self.ii(i)] *= aux
-            if(not i[m]):
-                self.state[self.ii(i)] /= aux
-                
+        if m>=self.size: raise ValueError('Qubit does not exist.')
+        aux1 = cmath.exp(0.5j*th)
+        aux2 = cmath.exp(-0.5j*th)
+        for i in range(2**(self.size-1)):
+            I = 2*i - i%2**m
+            J = I + 2**m
+            self.state[I] *= aux1
+            self.state[J] *= aux2
         
                 
     #######################################
@@ -185,17 +188,14 @@ class QC(object):
             c (int): control qubit.
             t (int): target qubit.
         """
-        if(c==t):
-            print('Error: control cannot be target')
-            return 
-        for i in prod([0,1], repeat=self.size):
-            j = np.array(i)
-            j[t] ^= 1
-            if(i[c] and i[t]):
-                self.state[self.ii(i)],self.state[self.ii(j)]=(
-                    self.state[self.ii(j)],
-                    self.state[self.ii(i)]
-                )
+        if c>=self.size: raise ValueError('Control does not exist.')
+        if t>=self.size: raise ValueError('Target does not exist.')
+        if c==t: raise ValueError('Control and Target cannot be the same.')
+        for i in range(2**(self.size-2)):
+            I = (2**c + i%2**c + ((i-i%2**c)*2)%2**t + 2*((i-i%2**c)*2 -
+                 ((2*(i-i%2**c))%2**t)))
+            J = I + 2**t
+            self.state[I], self.state[J] = self.state[J], self.state[I]
                 
     def cz(self, c, t):
         """Apply a Controlled-Z gate.
@@ -204,13 +204,30 @@ class QC(object):
             c (int): control qubit.
             t (int): target qubit.
         """
-        if(c==t):
-            print('Error: control cannot be target')
-            return 
-        for i in prod([0,1], repeat=self.size):
-            if(i[c] and i[t]):
-                self.state[self.ii(i)] *= -1
-                
+        if c>=self.size: raise ValueError('Control does not exist.')
+        if t>=self.size: raise ValueError('Target does not exist.')
+        if c==t: raise ValueError('Control and Target cannot be the same.')
+        if t<c: t,c = c,t
+        for i in range(2**(self.size-2)):
+            I = (2**c + i%2**c + ((i-i%2**c)*2)%2**t + 2*((i-i%2**c)*2 -
+                 ((2*(i-i%2**c))%2**t)) + 2**t)
+            self.state[I] -= 1
+
+    def swap(self, m, n):
+        """Apply a SWAP gate.
+
+        Args.
+            m (int): first qubit.
+            n (int): second qubit.
+        """
+        if m>=self.size: raise ValueError('First Qubit does not exist.')
+        if n>=self.size: raise ValueError('Second Qubit does not exist.')
+        if m==n: raise ValueError('Both Qubits cannot be the same.')
+        for i in range(2**(self.size-2)):
+            I = (i%2**m + ((i-i%2**m)*2)%2**n + 2*((i-i%2**m)*2 - 
+                 ((2*(i-i%2**m))%2**n)) + 2**n)
+            J = I + 2**m - 2**n
+            self.state[I], self.state[J] = self.state[J], self.state[I]
     ############################################
     # Circuits
     ############################################
@@ -360,14 +377,20 @@ import time
 hola = QC(4)
 inici1 = time.time()
 for i in range(4):
-    hola.x(i)
+    hola.h(i)
+hola.state=list(range(16))
+hola.cnot(0,1)
+#hola.cnot(2,3)
 print(hola.state)
 final1 = time.time()
 print("temps 1 = ", final1-inici1)
 hola.initialize()
 inici2 = time.time()
 for i in range(4):
-    hola.x2(i)
+    hola.h(i)
+hola.state=list(range(16))
+hola.cnot2(0,1)
+#hola.cnot2(2,3)
 print(hola.state)
 final2 = time.time()
 print("temps 2 = ", final2-inici2)
