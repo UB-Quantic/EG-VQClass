@@ -450,7 +450,7 @@ training_data, test_data = datagen.read('../data/data3.txt', 1000, 1000)
 learning_rate = 1
 step = 0.1
 epochs = 30
-hola = QC(1,3)
+hola = QC(1,6)
 print(hola.angles)
 pars, ctr, cte, atr, ate = hola.NGD(training_data, hola.angles, learning_rate,
                                     step, epochs, test_data)
@@ -458,3 +458,5 @@ print(ctr)
 hola.angles = pars[-1]
 print(hola.angles)
 hola.plot(test_data, hola.angles)
+plt.plot(range(len(ctr)),ctr,'g-',range(len(cte)),cte,'y-')
+plt.show()
