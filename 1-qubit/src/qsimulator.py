@@ -309,77 +309,69 @@ class QC(object):
         for i in range(len(dif)):
             for j in range(len(dif[i])):
                 dif[i][j] = half
-                print(dif)
                 nabla[i][j] = (self.C(data, parameters+dif)-
                                self.C(data, parameters-dif))*hinv
                 dif[i][j] = 0
         return nabla
 
-    #########################################
-    # Quantum Backpropagation
-    #########################################
-
-    def SGD(self, training_data, epochs, mini_batch_size, learning_rate,
-            test_data):
-        """Train a variational circuit using Stochastic Gradient Descent.
+    ###########################################
+    # Learning
+    ###########################################
+    def NGD(self, training_data, parameters, learning_rate, step, epochs,
+              test_data=None):
+        """Perform a nummerical gradient descent.
         Args.
-            training_data (array float): set of training input points.
-            epochs (int): number of learning epochs performed.
-            mini_batch_size (int): size of the learning batches.
-            learning_rate (float): distance moved on every step.
-            test_data (array float): set of test input points.
-        """
-        n = len(training_data)
-        if test_data:
-            n_test = len(test_data)
-        for j in range(epochs):
-            comb = list(zip(training_data[0],training_data[1]))
-            random.shuffle(comb)
-            training_data[0][:], training_data[1][:]=zip(*comb)
-            mini_batches = [
-                training_data[k:k+mini_batch_size] for k in
-                range(0,n,mini_batch_size)
-            ]
-            for mini_batch in mini_batches:
-                self.update_mini_batch(mini_batch, learning_rate)
-
-    def update_mini_batch(self, mini_batch, learning_rate):
-        """Propose a new set of parameters for an input batch.
-        Args.
-            mini_batch (array float): set of input points.
-            learning_rate (float): distance moved along the gradient.
-        """
-        new_angles = [np.zeros(a.shape) for a in self.angles]
-
-        for x,y in zip(mini_batch[0], mini_batch[1]):
-            delta_new_angles = self.backpropagate(x,y)
-            new_angles = [na + dna for na, dna in zip(new_angles,
-                                                      delta_new_angles)]
-        self.angles = [a - (learning_rate/len(mini_batch)) * na 
-                       for a, na in zip(self.angles, new_angles)]
-
-    def backpropagate(self, x, y):
-        """Propose a new set of angles using a backpropagation algorithm.
-        Args.
-            x (dim=2 float): coordinates of input point.
-            y (int): desired output for input point.
+            training_data (array float): training input data set.
+            parameters (array float): NEEDS BE GOTTEN RID OF.
+            learning_rate (float): distance advanced towards the gradient.
+            step (float): nummerical differentiation step.
+            epochs (int): number of iterations performed.
+            test_data (array float): test input data set.
         Ret.
-            new_angles (array float): proposal of new angles for one input.
+            new_parameters (array float): new set of parameters proposed.
+            cost_train (array float): cost value after every epoch for train.
+            cost_test (array float): cost value after every epoch for test.
+            accu_train (array float): accuracy after every epoch for train.
+            accu_test (array float): accuracy after every epoch for test.
         """
-        new_angles = [np.zeros(a.shape) for a in self.angles]
-        #---------------FeedForward------------
-        activation = self.state
-        activations = [activation]
-        for a in self.angles:
-            activation = self.unitary(0,a[0],a[1],a[2])
-            activations.append(activation)
-        #---------------Backward pass----------
+        new_parameters = []
+        cost_train, cost_test, accu_train, accu_test = [],[],[],[]
+        for i in range(epochs):
+            parameters = (parameters - 
+                          np.dot(learning_rate,self.gradC(training_data,
+                                                          parameters, step)))
+            new_parameters.append(parameters)
+            cost_train.append(self.C(training_data, parameters))
+            if test_data:
+                cost_test.append(self.C(test_data, parameters))
+            accu_train.append(self.accuracy(training_data, parameters))
+            accu_test.append(self.accuracy(test_data, parameters))
+        return new_parameters, cost_train, cost_test, accu_train, accu_test
 
+    def accuracy(self, data, parameters):
+        """Computes the accuracy of classification for a set of parameters.
+        Args.
+            data (array float): input data set.
+            parameters (array float): NEEDS BE GOTTEN RID OF.
+        Ret.
+            accu (int): number of inputs correctly classified.
+        """
+        # Work in progress, haven't decided yet on how to classify
+        return 1
+
+                    
 
 import datagen
 
 training_data, test_data = datagen.read('../data/data3.txt', 50, 50)
+learning_rate = 1
+step = 0.1
+epochs = 30
 hola = QC(1,2)
 print(hola.angles)
 print(hola.C(training_data, hola.angles))
-print(hola.gradC(training_data, hola.angles, 1))
+pars, ctr, cte, atr, ate = hola.NGD(training_data, hola.angles, learning_rate,
+                                    step, epochs, test_data)
+print(ctr)
+hola.angles = pars[-1]
+print(hola.angles)
