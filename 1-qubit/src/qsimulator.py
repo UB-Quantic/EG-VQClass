@@ -215,7 +215,7 @@ class QC(object):
             m (int): qubit the gate is applied on.
             beta (float): first angle.
             gamma (float): second angle.
-            delta (float): third angle.
+            lamb (float): third angle.
         """
         if m>=self.size: raise ValueError('Qubit does not exist.')
         c = math.cos(0.5*theta)
@@ -229,6 +229,103 @@ class QC(object):
             b = s*ephi*self.state[I] + c*ephi*elamb*self.state[J]
             self.state[I] = a
             self.state[J] = b
+
+    def transunit(self, m, theta, phi, lamb, vector):
+        """Transpose of the unitary gate right above.
+        Args.
+            m (int): qubit the gate is applied on.
+            beta (float): first angle.
+            gamma (float): second angle.
+            lamb (float): third angle.
+            vector (array complex): what the operator acts on.
+        Ret.
+            vector (array complex): image of the operation.
+        """
+        if m>=self.size: raise ValueError('Qubit does not exist.')
+        c = math.cos(0.5*theta)
+        s = math.sin(0.5*theta)
+        ephi = cmath.exp(1j*phi)
+        elamb = cmath.exp(1j*lamb)
+        for i in range(2**(self.size-1)):
+            I = 2*i -i%(2**m)
+            J = I+2**m
+            a = c*self.state[I] + s*ephi*self.state[J]
+            b = -s*elamb*self.state[I] + c*ephi*elamb*self.state[J]
+            self.state[I], self.state[J] = a, b
+
+    def difunit1(self, m, theta, phi, lamb, vector):
+        """Unitary gate differentiated with respect to theta on m'th qubit.
+        Not unitary anymore.
+        Args.
+            m (int): qubit the operator is applied on.
+            beta (float): first angle.
+            gamma (float): second angle.
+            lamb (float): third angle.
+            vector (array complex): what the operator acts on.
+        Ret.
+            vector (array complex): image of the operation.
+        """
+        if m>=self.size: raise ValueError('Qubit does not exist.')
+        c = math.cos(0.5*theta)
+        s = math.sin(0.5*theta)
+        ephi = cmath.exp(1j*phi)
+        elamb = cmath.exp(1j*lamb)
+        for i in range(2**(self.size-1)):
+            I = 2*i-i%(2**m)
+            J = I+2**m
+            a = -s*vector[I] -c*elamb*vector[J]
+            b = c*ephi*vector[I] -s*ephi*elamb*vector[J]
+            vector[I], vector[J] = a, b
+        return vector
+
+    def difunit2(self, m, theta, phi, lamb, vector):
+        """Unitary operator differentiated with respect to phi on m'th qubit.
+        Not unitary anymore.
+        Args.
+            m (int): qubit the operator is applied on.
+            beta (float): first angle.
+            gamma (float): second angle.
+            delta (float): third angle.
+            vector (array complex): what the operator acts on.
+        Ret.
+            vector (array complex): image of the operation.
+        """
+        if m>=self.size: raise ValueError('Qubit does not exist.')
+        c = math.cos(0.5*theta)
+        s = math.sin(0.5*theta)
+        ephi = 1j*cmath.exp(1j*phi)
+        elamb = cmath.exp(1j*lamb)
+        for i in range(2**(self.size-1)):
+            I = 2*i-i%(2**m)
+            J = I+2**m
+            vector[J] = s*ephi*vector[I]+c*ephi*elamb*vector[J]
+            vector[I] = 0
+        return vector
+
+    def difunit3(self, m, theta, phi, lamb, vector):
+        """Unitary operator differentiated with respect to lamb on m'th qubit.
+        Not unitary anymore.
+        Args.
+            m (int): qubit the operator is applied on.
+            theta (float): first angle.
+            phi (float): second angle.
+            lamb (float): third angle.
+            vector (array complex): what the operator acts on.
+        Ret.
+            vector (array complex): image of the operation.
+        """
+        if m>=self.size: raise ValueError('Qubit does not exist.')
+        c = math.cos(0.5*theta)
+        s = math.sin(0.5*theta)
+        ephi = cmath.exp(1j*phi)
+        elamb = 1j*cmath.exp(1j*lamb)
+        for i in range(2**(self.size-1)):
+            I = 2*i-i%(2**m)
+            J = I+2**m
+            vector[I] = -s*elamb*vector[J]
+            vector[J] = c*ephi*elamb*vector[J]
+            return vector[J]
+
 
     def block(self, m, point, angles, style=1):
         """Apply a learning block on the m'th qubit.
@@ -270,7 +367,7 @@ class QC(object):
         Ret.
             cp (float): cost value for a single input.
         """
-        cp = np.linalg.norm(label/3 - self.run(point, parameters))
+        cp = np.linalg.norm(label - 3*self.run(point, parameters))
         cp = 0.5*cp*cp
         return cp
 
@@ -368,18 +465,20 @@ class QC(object):
         """
         new_angles = [np.zeros(a.shape) for a in self.angles]
         #---------------FeedForward------------
-        activation = self.state
-        activations = [activation]
+        activations = []
+        activations.append(list(self.state))
         for a in self.angles:
-            activation = self.unitary(0,a[0],a[1],a[2])
-            activations.append(activation)
+            self.unitary(0,a[0],a[1],a[2])
+            activations.append(list(self.state))
         #---------------Backward pass----------
-
+        return activations
 
 import datagen
-
+datagen.write('../data/data3.txt',100)
 training_data, test_data = datagen.read('../data/data3.txt', 50, 50)
 hola = QC(1,2)
 print(hola.angles)
-print(hola.C(training_data, hola.angles))
-print(hola.gradC(training_data, hola.angles, 1))
+acts = hola.backpropagate([1,0],3)
+print(acts)
+delta=[-np.conj(acts[-1][0])*(3-acts[-1][0]*np.conj(acts[-1][0])*3),0]
+
