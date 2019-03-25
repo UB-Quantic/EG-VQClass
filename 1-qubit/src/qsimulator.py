@@ -315,10 +315,71 @@ class QC(object):
                 dif[i][j] = 0
         return nabla
 
+    #########################################
+    # Quantum Backpropagation
+    #########################################
+
+    def SGD(self, training_data, epochs, mini_batch_size, learning_rate,
+            test_data):
+        """Train a variational circuit using Stochastic Gradient Descent.
+        Args.
+            training_data (array float): set of training input points.
+            epochs (int): number of learning epochs performed.
+            mini_batch_size (int): size of the learning batches.
+            learning_rate (float): distance moved on every step.
+            test_data (array float): set of test input points.
+        """
+        n = len(training_data)
+        if test_data:
+            n_test = len(test_data)
+        for j in range(epochs):
+            comb = list(zip(training_data[0],training_data[1]))
+            random.shuffle(comb)
+            training_data[0][:], training_data[1][:]=zip(*comb)
+            mini_batches = [
+                training_data[k:k+mini_batch_size] for k in
+                range(0,n,mini_batch_size)
+            ]
+            for mini_batch in mini_batches:
+                self.update_mini_batch(mini_batch, learning_rate)
+
+    def update_mini_batch(self, mini_batch, learning_rate):
+        """Propose a new set of parameters for an input batch.
+        Args.
+            mini_batch (array float): set of input points.
+            learning_rate (float): distance moved along the gradient.
+        """
+        new_angles = [np.zeros(a.shape) for a in self.angles]
+
+        for x,y in zip(mini_batch[0], mini_batch[1]):
+            delta_new_angles = self.backpropagate(x,y)
+            new_angles = [na + dna for na, dna in zip(new_angles,
+                                                      delta_new_angles)]
+        self.angles = [a - (learning_rate/len(mini_batch)) * na 
+                       for a, na in zip(self.angles, new_angles)]
+
+    def backpropagate(self, x, y):
+        """Propose a new set of angles using a backpropagation algorithm.
+        Args.
+            x (dim=2 float): coordinates of input point.
+            y (int): desired output for input point.
+        Ret.
+            new_angles (array float): proposal of new angles for one input.
+        """
+        new_angles = [np.zeros(a.shape) for a in self.angles]
+        #---------------FeedForward------------
+        activation = self.state
+        activations = [activation]
+        for a in self.angles:
+            activation = self.unitary(0,a[0],a[1],a[2])
+            activations.append(activation)
+        #---------------Backward pass----------
+
+
 import datagen
 
 training_data, test_data = datagen.read('../data/data3.txt', 50, 50)
 hola = QC(1,2)
 print(hola.angles)
 print(hola.C(training_data, hola.angles))
-print(hola.gradC(training_data, hola.angles, 0.1))
+print(hola.gradC(training_data, hola.angles, 1))
