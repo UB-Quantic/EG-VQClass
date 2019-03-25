@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import cmath
+import matplotlib.pyplot as plt
 
 Pi = math.pi
 
@@ -357,29 +358,103 @@ class QC(object):
             accu (int): number of inputs correctly classified.
         """
         # Work in progress, haven't decided yet on how to classify
+        results = []
         for (x,y) in zip(data[0], data[1]):
             p0 = self.run(x, parameters)
             if p0<0.25: p=0
             elif p0<0.5: p=1
             elif p0<0.75: p=2
-            else: p0=3
-#############################################
-#        KEEP FROM HERE
-#############################################
+            else: p=3
+            results.append([p,y])
+        accu=sum(int(x == y) for (x,y) in results)
+        return accu
 
+    def test(self, data, parameters):
+        """Arranges the data into classes, right and wrong lists.
+        Args.
+            data (array float): input data set.
+            parameters (array float): NEEDS BE GOTTEN RID OF.
+        Ret.
+            circles (array float): one list of points per circle.
+            right (array float): points correctly classified.
+            wrong (array float): points incorrectly classified.
+        """
+        circles =[[],[],[],[]]
+        right, wrong = [],[]
+        results = []
+        for (x,y) in zip(data[0], data[1]):
+            p0 = self.run(x, parameters)
+            if p0<0.25: p=0
+            elif p0<0.5: p=1
+            elif p0<0.75: p=2
+            else: p=3
+            results.append([p,y])
+        for (x,y) in zip(data[0], results):
+            circles[y[0]].append(x)
+            if(y[0]==y[1]):
+                right.append(x)
+            else:
+                wrong.append(x)
+        return circles, right, wrong
+
+    def plot(self, data, parameters):
+        """Plots the already sorted inputs.
+        Args.
+            data (array float): input data set.
+            parameters (array float): NEEDS BE GOTTEN RID OF.
+        """
+        circles, right, wrong = self.test(data, parameters)
+        cx = [0, -0.5, -1, 1]
+        cy = [0, -0.5, 1, 0]
+        r = [2, 0.5, 1, 1]
+        plt.figure(figsize=(9,4))
+        x = [[],[],[],[]]
+        y = [[],[],[],[]]
+        z = [[],[]]
+        t = [[],[]]
+        for i in range(len(circles)):
+            for point in circles[i]:
+                x[i].append(point[0])
+                y[i].append(point[1])
+        ax = plt.subplot(121)
+        circle = []
+        for i in range(4):
+            circle.append(plt.Circle((cx[i],cy[i]),r[i],
+                                     color='k',fill=False))
+            ax.add_artist(circle[-1])
+        ax.plot(x[0],y[0],'bo', x[1],y[1],'ko', x[2],y[2],'mo',
+                x[3],y[3],'yo',markersize=3)
+        plt.xlabel('x')
+        plt.ylabel('y')
+        for rights in right:
+            z[0].append(rights[0])
+            z[1].append(rights[1])
+        for wrongs in wrong:
+            t[0].append(wrongs[0])
+            t[1].append(wrongs[1])
+        bx = plt.subplot(122)
+        for i in range(4):
+            circle.append(plt.Circle((cx[i],cy[i]),r[i],
+                          color='k',fill=False))
+            bx.add_artist(circle[-1])
+        bx.plot(z[0],z[1],'go', t[0],t[1],'ro', markersize=3)
+        plt.xlabel('x')
+        plt.suptitle('sucess rate {:2.2f}%'.format(
+            len(right)*100/len(data[0])))
+        plt.show()
                     
 
 import datagen
 
-training_data, test_data = datagen.read('../data/data3.txt', 50, 50)
+training_data, test_data = datagen.read('../data/data3.txt', 1000, 1000)
 learning_rate = 1
 step = 0.1
 epochs = 30
-hola = QC(1,2)
+hola = QC(1,3)
 print(hola.angles)
-print(hola.C(training_data, hola.angles))
 pars, ctr, cte, atr, ate = hola.NGD(training_data, hola.angles, learning_rate,
                                     step, epochs, test_data)
 print(ctr)
 hola.angles = pars[-1]
 print(hola.angles)
+hola.plot(test_data, hola.angles)
