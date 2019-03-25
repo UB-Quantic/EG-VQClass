@@ -270,7 +270,7 @@ class QC(object):
         Ret.
             cp (float): cost value for a single input.
         """
-        cp = np.linalg.norm(label/3 - self.run(point, parameters))
+        cp = np.linalg.norm(label - 3*self.run(point, parameters))
         cp = 0.5*cp*cp
         return cp
 
@@ -357,7 +357,15 @@ class QC(object):
             accu (int): number of inputs correctly classified.
         """
         # Work in progress, haven't decided yet on how to classify
-        return 1
+        for (x,y) in zip(data[0], data[1]):
+            p0 = self.run(x, parameters)
+            if p0<0.25: p=0
+            elif p0<0.5: p=1
+            elif p0<0.75: p=2
+            else: p0=3
+#############################################
+#        KEEP FROM HERE
+#############################################
 
                     
 
