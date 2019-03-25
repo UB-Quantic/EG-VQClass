@@ -241,7 +241,8 @@ class QC(object):
         """
         if m>=self.size: raise ValueError('Qubit does not exist.')
         if style:
-            self.unitary(m, point[0]+angles[0], point[1]+angles[1], angles[2])
+            self.unitary(m, Pi*point[0]+angles[0],
+                         Pi*point[1]+angles[1], angles[2])
         else:
             self.ry(m, point[0]*0.5*Pi)
             self.rz(m, (1+point[1])*Pi)
@@ -357,7 +358,6 @@ class QC(object):
         Ret.
             accu (int): number of inputs correctly classified.
         """
-        # Work in progress, haven't decided yet on how to classify
         results = []
         for (x,y) in zip(data[0], data[1]):
             p0 = self.run(x, parameters)
@@ -442,21 +442,3 @@ class QC(object):
         plt.suptitle('sucess rate {:2.2f}%'.format(
             len(right)*100/len(data[0])))
         plt.show()
-                    
-
-import datagen
-
-training_data, test_data = datagen.read('../data/data3.txt', 1000, 1000)
-learning_rate = 1
-step = 0.1
-epochs = 30
-hola = QC(1,6)
-print(hola.angles)
-pars, ctr, cte, atr, ate = hola.NGD(training_data, hola.angles, learning_rate,
-                                    step, epochs, test_data)
-print(ctr)
-hola.angles = pars[-1]
-print(hola.angles)
-hola.plot(test_data, hola.angles)
-plt.plot(range(len(ctr)),ctr,'g-',range(len(cte)),cte,'y-')
-plt.show()
