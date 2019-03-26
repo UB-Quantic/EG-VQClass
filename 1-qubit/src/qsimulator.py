@@ -406,7 +406,6 @@ class QC(object):
         for i in range(len(dif)):
             for j in range(len(dif[i])):
                 dif[i][j] = half
-                print(dif)
                 nabla[i][j] = (self.C(data, parameters+dif)-
                                self.C(data, parameters-dif))*hinv
                 dif[i][j] = 0
@@ -471,14 +470,25 @@ class QC(object):
             self.unitary(0,a[0],a[1],a[2])
             activations.append(list(self.state))
         #---------------Backward pass----------
-        return activations
+        delta = [-np.conj(activations[-1][0])*
+                 (y-3*activations[-1][0]*np.conj(activations[-1][0])),0]
+        dif_act = self.difunit1(0, self.angles[-1][0]+x[0],
+                                self.angles[-1][1]+x[1],
+                                self.angles[-1][2], activations[-2])
+        print('delta = ', delta)
+        print('dif_act = ', dif_act)
+        new_angles[-1][0] = np.dot(delta,dif_act)
+        return new_angles
+# Need to rewrite stuff considering that the point coordinates
+# are summed to the angles, and that was not included the first time
+# it's going to add some multiplicative factors which might make the 
+# derivatives become real in the end.
 
 import datagen
 datagen.write('../data/data3.txt',100)
 training_data, test_data = datagen.read('../data/data3.txt', 50, 50)
 hola = QC(1,2)
 print(hola.angles)
-acts = hola.backpropagate([1,0],3)
-print(acts)
-delta=[-np.conj(acts[-1][0])*(3-acts[-1][0]*np.conj(acts[-1][0])*3),0]
-
+new_angles = hola.backpropagate([1,0],3)
+print(new_angles)
+print(hola.gradC([[[-1,0]],[3]],hola.angles,0.01))
