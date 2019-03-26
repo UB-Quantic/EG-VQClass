@@ -213,8 +213,8 @@ class QC(object):
         Every unitary gate is characterized by three angles.
         Args.
             m (int): qubit the gate is applied on.
-            beta (float): first angle.
-            gamma (float): second angle.
+            theta (float): first angle.
+            phi (float): second angle.
             lamb (float): third angle.
         """
         if m>=self.size: raise ValueError('Qubit does not exist.')
@@ -234,8 +234,8 @@ class QC(object):
         """Transpose of the unitary gate right above.
         Args.
             m (int): qubit the gate is applied on.
-            beta (float): first angle.
-            gamma (float): second angle.
+            theta (float): first angle.
+            phi (float): second angle.
             lamb (float): third angle.
             vector (array complex): what the operator acts on.
         Ret.
@@ -258,16 +258,16 @@ class QC(object):
         Not unitary anymore.
         Args.
             m (int): qubit the operator is applied on.
-            beta (float): first angle.
-            gamma (float): second angle.
+            theta (float): first angle.
+            phi (float): second angle.
             lamb (float): third angle.
             vector (array complex): what the operator acts on.
         Ret.
             vector (array complex): image of the operation.
         """
         if m>=self.size: raise ValueError('Qubit does not exist.')
-        c = math.cos(0.5*theta)
-        s = math.sin(0.5*theta)
+        c = 0.5*math.cos(0.5*theta)
+        s = 0.5*math.sin(0.5*theta)
         ephi = cmath.exp(1j*phi)
         elamb = cmath.exp(1j*lamb)
         for i in range(2**(self.size-1)):
@@ -283,9 +283,9 @@ class QC(object):
         Not unitary anymore.
         Args.
             m (int): qubit the operator is applied on.
-            beta (float): first angle.
-            gamma (float): second angle.
-            delta (float): third angle.
+            theta (float): first angle.
+            phi (float): second angle.
+            lamb (float): third angle.
             vector (array complex): what the operator acts on.
         Ret.
             vector (array complex): image of the operation.
@@ -351,8 +351,8 @@ class QC(object):
         Ret.
             p0 (float): probability of the final state being |0>.
         """
-        for i in range(self.depth):
-            self.block(0, point, parameters[i], style)
+        for layer in parameters:
+            self.block(0, point, layer, style)
         p0 = self.state[0]
         p0 = p0*np.conj(p0)
         self.initialize()
@@ -402,12 +402,18 @@ class QC(object):
         nabla = ([np.zeros(a.shape) for a in parameters])
         dif = np.asarray([np.zeros(a.shape) for a in parameters])
         half=0.5*step
-        hinv=1/step
+        inv=1/step
+        print('GRADIENT')
+        print('data: ', data)
         for i in range(len(dif)):
             for j in range(len(dif[i])):
                 dif[i][j] = half
+                self.C(data,parameters+dif)-self.C(data,parameters-dif)
+                print('\tgrad = ',
+                      (self.C(data,parameters+dif)-self.C(data,parameters-dif))*inv)
                 nabla[i][j] = (self.C(data, parameters+dif)-
-                               self.C(data, parameters-dif))*hinv
+                               self.C(data, parameters-dif))*inv
+                print('\tgrad = ', nabla[i][j])
                 dif[i][j] = 0
         return nabla
 
@@ -470,13 +476,14 @@ class QC(object):
             self.unitary(0,a[0],a[1],a[2])
             activations.append(list(self.state))
         #---------------Backward pass----------
-        delta = [-np.conj(activations[-1][0])*
+        delta = [-3*np.conj(activations[-1][0])*
                  (y-3*activations[-1][0]*np.conj(activations[-1][0])),0]
         dif_act = self.difunit1(0, self.angles[-1][0]+x[0],
                                 self.angles[-1][1]+x[1],
                                 self.angles[-1][2], activations[-2])
         print('delta = ', delta)
         print('dif_act = ', dif_act)
+        print('delta*dif = ', np.dot(delta,dif_act))
         new_angles[-1][0] = np.dot(delta,dif_act)
         return new_angles
 # Need to rewrite stuff considering that the point coordinates
@@ -485,10 +492,12 @@ class QC(object):
 # derivatives become real in the end.
 
 import datagen
-datagen.write('../data/data3.txt',100)
+
 training_data, test_data = datagen.read('../data/data3.txt', 50, 50)
-hola = QC(1,2)
-print(hola.angles)
+hola = QC(1,1)
+print('angles inicials: ', hola.angles)
 new_angles = hola.backpropagate([1,0],3)
-print(new_angles)
-print(hola.gradC([[[-1,0]],[3]],hola.angles,0.01))
+print('backprop: ', new_angles)
+print('gradC: ', hola.gradC([[[1,0],[-0.5,-0.5]],[3,1]],hola.angles,0.0001))
+print('cost = ', hola.C([[[1,0],[-0.5,-0.5]],[3,1]],hola.angles))
+print('totalcost = ', hola.C(training_data, hola.angles))
