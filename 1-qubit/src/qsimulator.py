@@ -1,7 +1,7 @@
 import numpy as np
 import math
 import cmath
-
+import random
 Pi = math.pi
 
 
@@ -252,6 +252,7 @@ class QC(object):
             a = c*self.state[I] + s*ephi*self.state[J]
             b = -s*elamb*self.state[I] + c*ephi*elamb*self.state[J]
             self.state[I], self.state[J] = a, b
+        return vector
 
     def difunit1(self, m, theta, phi, lamb, vector):
         """Unitary gate differentiated with respect to theta on m'th qubit.
@@ -324,7 +325,7 @@ class QC(object):
             J = I+2**m
             vector[I] = -s*elamb*vector[J]
             vector[J] = c*ephi*elamb*vector[J]
-            return vector[J]
+        return vector
 
 
     def block(self, m, point, angles, style=1):
@@ -403,17 +404,11 @@ class QC(object):
         dif = np.asarray([np.zeros(a.shape) for a in parameters])
         half=0.5*step
         inv=1/step
-        print('GRADIENT')
-        print('data: ', data)
         for i in range(len(dif)):
             for j in range(len(dif[i])):
                 dif[i][j] = half
-                self.C(data,parameters+dif)-self.C(data,parameters-dif)
-                print('\tgrad = ',
-                      (self.C(data,parameters+dif)-self.C(data,parameters-dif))*inv)
                 nabla[i][j] = (self.C(data, parameters+dif)-
                                self.C(data, parameters-dif))*inv
-                print('\tgrad = ', nabla[i][j])
                 dif[i][j] = 0
         return nabla
 
@@ -433,17 +428,22 @@ class QC(object):
         """
         n = len(training_data)
         if test_data:
+            test = []
             n_test = len(test_data)
+            for i in range(n_test):
+                test.append([test_data[0][i],test_data[1][i]])
         for j in range(epochs):
             comb = list(zip(training_data[0],training_data[1]))
             random.shuffle(comb)
-            training_data[0][:], training_data[1][:]=zip(*comb)
+            #training_data[0][:], training_data[1][:]=zip(*comb)
             mini_batches = [
                 training_data[k:k+mini_batch_size] for k in
                 range(0,n,mini_batch_size)
             ]
             for mini_batch in mini_batches:
                 self.update_mini_batch(mini_batch, learning_rate)
+            print('after epoch',j,'score is: ', self.accuracy(test_data))
+            print('\tcost = ',self.C(test_data,self.angles))
 
     def update_mini_batch(self, mini_batch, learning_rate):
         """Propose a new set of parameters for an input batch.
@@ -468,36 +468,68 @@ class QC(object):
         Ret.
             new_angles (array float): proposal of new angles for one input.
         """
+        # CAREFUL! the gradient is not perfectly calculated
+        # and so the derivatives dC/dth are complex, 
+        # which does not make much sense. This leads to poor performance
+        # since the parameters update is kind of unkown to us right now.
         new_angles = [np.zeros(a.shape) for a in self.angles]
         #---------------FeedForward------------
-        activations = []
-        activations.append(list(self.state))
+        activations = [self.state.copy()]
+        #activations.append(list(self.state))
         for a in self.angles:
             self.unitary(0,a[0],a[1],a[2])
             activations.append(list(self.state))
         #---------------Backward pass----------
+            # First step
         delta = [-3*np.conj(activations[-1][0])*
                  (y-3*activations[-1][0]*np.conj(activations[-1][0])),0]
         dif_act = self.difunit1(0, self.angles[-1][0]+x[0],
                                 self.angles[-1][1]+x[1],
-                                self.angles[-1][2], activations[-2])
-        print('delta = ', delta)
-        print('dif_act = ', dif_act)
-        print('delta*dif = ', np.dot(delta,dif_act))
+                                self.angles[-1][2], activations[-2].copy())
         new_angles[-1][0] = np.dot(delta,dif_act)
+        dif_act = self.difunit2(0, self.angles[-1][0]+x[0],
+                                self.angles[-1][1]+x[1],
+                                self.angles[-1][2], activations[-2].copy())
+        new_angles[-1][1] = np.dot(delta,dif_act)
+        dif_act = self.difunit3(0, self.angles[-1][0]+x[0],
+                                self.angles[-1][1]+x[1],
+                                self.angles[-1][2], activations[-2].copy())
+        new_angles[-1][2] = np.dot(delta,dif_act)
+            # Recursive steps
+        for l in range(1, self.depth):
+            psi = activations[-l-2].copy()
+            delta = self.transunit(0, self.angles[-l][0]+x[0],
+                                   self.angles[-l][1]+x[1],
+                                   self.angles[-l][2], delta)
+            dif_act = self.difunit1(0, self.angles[-l-1][0]+x[0],
+                                    self.angles[-l-1][1]+x[1],
+                                    self.angles[-l-1][2],psi)
+            new_angles[-l-1][0] = np.dot(delta,dif_act)
+            dif_act = self.difunit2(0, self.angles[-l-1][0]+x[0],
+                                    self.angles[-l-1][1]+x[1],
+                                    self.angles[-l-1][2],psi)
+            new_angles[-l-1][1] = np.dot(delta,dif_act)
+            dif_act = self.difunit3(0, self.angles[-l-1][0]+x[0],
+                                    self.angles[-l-1][1]+x[1],
+                                    self.angles[-l-1][2],psi)
+            new_angles[-l-1][2] = np.dot(delta,dif_act)
+        self.initialize()
         return new_angles
-# Need to rewrite stuff considering that the point coordinates
-# are summed to the angles, and that was not included the first time
-# it's going to add some multiplicative factors which might make the 
-# derivatives become real in the end.
 
-import datagen
-
-training_data, test_data = datagen.read('../data/data3.txt', 50, 50)
-hola = QC(1,1)
-print('angles inicials: ', hola.angles)
-new_angles = hola.backpropagate([1,0],3)
-print('backprop: ', new_angles)
-print('gradC: ', hola.gradC([[[1,0],[-0.5,-0.5]],[3,1]],hola.angles,0.0001))
-print('cost = ', hola.C([[[1,0],[-0.5,-0.5]],[3,1]],hola.angles))
-print('totalcost = ', hola.C(training_data, hola.angles))
+    def accuracy(self, data):
+        """Computes the classification accuracy.
+        Args.
+            data (array float): input data set.
+        Ret.
+            score (int): number of inputs correctly classified.
+        """
+        results = []
+        for (x,y) in zip(data[0],data[1]):
+            p0 = self.run(x,self.angles)
+            if p0<0.25: p=0
+            elif p0<0.5: p=1
+            elif p0<0.75: p=2
+            else: p=3
+            results.append([p,y])
+        score=sum(int(x==y) for (x,y) in results)
+        return score
