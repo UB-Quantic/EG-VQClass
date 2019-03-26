@@ -2,6 +2,7 @@ import numpy as np
 import math
 import cmath
 import matplotlib.pyplot as plt
+import random
 
 Pi = math.pi
 
@@ -214,9 +215,9 @@ class QC(object):
         Every unitary gate is characterized by three angles.
         Args.
             m (int): qubit the gate is applied on.
-            beta (float): first angle.
-            gamma (float): second angle.
-            delta (float): third angle.
+            theta (float): first angle.
+            phi (float): second angle.
+            lamb (float): third angle.
         """
         if m>=self.size: raise ValueError('Qubit does not exist.')
         c = math.cos(0.5*theta)
@@ -230,6 +231,104 @@ class QC(object):
             b = s*ephi*self.state[I] + c*ephi*elamb*self.state[J]
             self.state[I] = a
             self.state[J] = b
+
+    def transunit(self, m, theta, phi, lamb, vector):
+        """Transpose of the unitary gate right above.
+        Args.
+            m (int): qubit the gate is applied on.
+            theta (float): first angle.
+            phi (float): second angle.
+            lamb (float): third angle.
+            vector (array complex): what the operator acts on.
+        Ret.
+            vector (array complex): image of the operation.
+        """
+        if m>=self.size: raise ValueError('Qubit does not exist.')
+        c = math.cos(0.5*theta)
+        s = math.sin(0.5*theta)
+        ephi = cmath.exp(1j*phi)
+        elamb = cmath.exp(1j*lamb)
+        for i in range(2**(self.size-1)):
+            I = 2*i -i%(2**m)
+            J = I+2**m
+            a = c*self.state[I] + s*ephi*self.state[J]
+            b = -s*elamb*self.state[I] + c*ephi*elamb*self.state[J]
+            self.state[I], self.state[J] = a, b
+        return vector
+
+    def difunit1(self, m, theta, phi, lamb, vector):
+        """Unitary gate differentiated with respect to theta on m'th qubit.
+        Not unitary anymore.
+        Args.
+            m (int): qubit the operator is applied on.
+            theta (float): first angle.
+            phi (float): second angle.
+            lamb (float): third angle.
+            vector (array complex): what the operator acts on.
+        Ret.
+            vector (array complex): image of the operation.
+        """
+        if m>=self.size: raise ValueError('Qubit does not exist.')
+        c = 0.5*math.cos(0.5*theta)
+        s = 0.5*math.sin(0.5*theta)
+        ephi = cmath.exp(1j*phi)
+        elamb = cmath.exp(1j*lamb)
+        for i in range(2**(self.size-1)):
+            I = 2*i-i%(2**m)
+            J = I+2**m
+            a = -s*vector[I] -c*elamb*vector[J]
+            b = c*ephi*vector[I] -s*ephi*elamb*vector[J]
+            vector[I], vector[J] = a, b
+        return vector
+
+    def difunit2(self, m, theta, phi, lamb, vector):
+        """Unitary operator differentiated with respect to phi on m'th qubit.
+        Not unitary anymore.
+        Args.
+            m (int): qubit the operator is applied on.
+            theta (float): first angle.
+            phi (float): second angle.
+            lamb (float): third angle.
+            vector (array complex): what the operator acts on.
+        Ret.
+            vector (array complex): image of the operation.
+        """
+        if m>=self.size: raise ValueError('Qubit does not exist.')
+        c = math.cos(0.5*theta)
+        s = math.sin(0.5*theta)
+        ephi = 1j*cmath.exp(1j*phi)
+        elamb = cmath.exp(1j*lamb)
+        for i in range(2**(self.size-1)):
+            I = 2*i-i%(2**m)
+            J = I+2**m
+            vector[J] = s*ephi*vector[I]+c*ephi*elamb*vector[J]
+            vector[I] = 0
+        return vector
+
+    def difunit3(self, m, theta, phi, lamb, vector):
+        """Unitary operator differentiated with respect to lamb on m'th qubit.
+        Not unitary anymore.
+        Args.
+            m (int): qubit the operator is applied on.
+            theta (float): first angle.
+            phi (float): second angle.
+            lamb (float): third angle.
+            vector (array complex): what the operator acts on.
+        Ret.
+            vector (array complex): image of the operation.
+        """
+        if m>=self.size: raise ValueError('Qubit does not exist.')
+        c = math.cos(0.5*theta)
+        s = math.sin(0.5*theta)
+        ephi = cmath.exp(1j*phi)
+        elamb = 1j*cmath.exp(1j*lamb)
+        for i in range(2**(self.size-1)):
+            I = 2*i-i%(2**m)
+            J = I+2**m
+            vector[I] = -s*elamb*vector[J]
+            vector[J] = c*ephi*elamb*vector[J]
+        return vector
+
 
     def block(self, m, point, angles, style=1):
         """Apply a learning block on the m'th qubit.
@@ -256,8 +355,8 @@ class QC(object):
         Ret.
             p0 (float): probability of the final state being |0>.
         """
-        for i in range(self.depth):
-            self.block(0, point, parameters[i], style)
+        for layer in parameters:
+            self.block(0, point, layer, style)
         p0 = self.state[0]
         p0 = p0*np.conj(p0)
         self.initialize()
@@ -307,12 +406,12 @@ class QC(object):
         nabla = ([np.zeros(a.shape) for a in parameters])
         dif = np.asarray([np.zeros(a.shape) for a in parameters])
         half=0.5*step
-        hinv=1/step
+        inv=1/step
         for i in range(len(dif)):
             for j in range(len(dif[i])):
                 dif[i][j] = half
                 nabla[i][j] = (self.C(data, parameters+dif)-
-                               self.C(data, parameters-dif))*hinv
+                               self.C(data, parameters-dif))*inv
                 dif[i][j] = 0
         return nabla
 
@@ -418,7 +517,7 @@ class QC(object):
                 y[i].append(point[1])
         ax = plt.subplot(121)
         circle = []
-        for i in range(4):
+        for i in range(len(circles)):
             circle.append(plt.Circle((cx[i],cy[i]),r[i],
                                      color='k',fill=False))
             ax.add_artist(circle[-1])
@@ -433,7 +532,7 @@ class QC(object):
             t[0].append(wrongs[0])
             t[1].append(wrongs[1])
         bx = plt.subplot(122)
-        for i in range(4):
+        for i in range(len(circles)):
             circle.append(plt.Circle((cx[i],cy[i]),r[i],
                           color='k',fill=False))
             bx.add_artist(circle[-1])
@@ -442,3 +541,124 @@ class QC(object):
         plt.suptitle('sucess rate {:2.2f}%'.format(
             len(right)*100/len(data[0])))
         plt.show()
+
+#####################################
+# Quantum Backpropagation
+#####################################
+
+    def SGD(self, training_data, epochs, mini_batch_size, learning_rate,
+            test_data):
+        """Train a variational circuit using Stochastic Gradient Descent.
+        Args.
+            training_data (array float): set of training input points.
+            epochs (int): number of learning epochs performed.
+            mini_batch_size (int): size of the learning batches.
+            learning_rate (float): distance moved on every step.
+            test_data (array float): set of test input points.
+        """
+        n = len(training_data)
+        if test_data:
+            test = []
+            n_test = len(test_data)
+            for i in range(n_test):
+                test.append([test_data[0][i],test_data[1][i]])
+        for j in range(epochs):
+            comb = list(zip(training_data[0],training_data[1]))
+            random.shuffle(comb)
+            #training_data[0][:], training_data[1][:]=zip(*comb)
+            mini_batches = [
+                training_data[k:k+mini_batch_size] for k in
+                range(0,n,mini_batch_size)
+            ]
+            for mini_batch in mini_batches:
+                self.update_mini_batch(mini_batch, learning_rate)
+            print('after epoch',j,'score is: ', self.accuracy(test_data))
+            print('\tcost = ',self.C(test_data,self.angles))
+
+    def update_mini_batch(self, mini_batch, learning_rate):
+        """Propose a new set of parameters for an input batch.
+        Args.
+            mini_batch (array float): set of input points.
+            learning_rate (float): distance moved along the gradient.
+        """
+        new_angles = [np.zeros(a.shape) for a in self.angles]
+        for x,y in zip(mini_batch[0], mini_batch[1]):
+            delta_new_angles = self.backpropagate(x,y)
+            new_angles = [na +dna for na, dna in zip(new_angles,
+                                                     delta_new_angles)]
+        self.angles = [a-(learning_rate/len(mini_batch))*na
+                       for a,na in zip(self.angles, new_angles)]
+
+    def backpropagate(self, x, y):
+        """Propose a new set of angles using a backpropagation algorithm.
+        Args.
+            x (dim=2 float): coordinates of input point.
+            y (int): desired output for input point.
+        Ret.
+            new_angles (array float): proposal of new angles for one input.
+        """
+        # CAREFUL! the gradient is not perfectly calculated
+        # and so the derivatives dC/dth are complex, 
+        # which does not make much sense. This leads to poor performance
+        # since the parameters update is kind of unkown to us right now.
+        new_angles = [np.zeros(a.shape) for a in self.angles]
+        #---------------FeedForward------------
+        activations = [self.state.copy()]
+        #activations.append(list(self.state))
+        for a in self.angles:
+            self.unitary(0,a[0],a[1],a[2])
+            activations.append(list(self.state))
+        #---------------Backward pass----------
+            # First step
+        delta = [-3*np.conj(activations[-1][0])*
+                 (y-3*activations[-1][0]*np.conj(activations[-1][0])),0]
+        dif_act = self.difunit1(0, self.angles[-1][0]+x[0],
+                                self.angles[-1][1]+x[1],
+                                self.angles[-1][2], activations[-2].copy())
+        new_angles[-1][0] = np.dot(delta,dif_act)
+        dif_act = self.difunit2(0, self.angles[-1][0]+x[0],
+                                self.angles[-1][1]+x[1],
+                                self.angles[-1][2], activations[-2].copy())
+        new_angles[-1][1] = np.dot(delta,dif_act)
+        dif_act = self.difunit3(0, self.angles[-1][0]+x[0],
+                                self.angles[-1][1]+x[1],
+                                self.angles[-1][2], activations[-2].copy())
+        new_angles[-1][2] = np.dot(delta,dif_act)
+            # Recursive steps
+        for l in range(1, self.depth):
+            psi = activations[-l-2].copy()
+            delta = self.transunit(0, self.angles[-l][0]+x[0],
+                                   self.angles[-l][1]+x[1],
+                                   self.angles[-l][2], delta)
+            dif_act = self.difunit1(0, self.angles[-l-1][0]+x[0],
+                                    self.angles[-l-1][1]+x[1],
+                                    self.angles[-l-1][2],psi)
+            new_angles[-l-1][0] = np.dot(delta,dif_act)
+            dif_act = self.difunit2(0, self.angles[-l-1][0]+x[0],
+                                    self.angles[-l-1][1]+x[1],
+                                    self.angles[-l-1][2],psi)
+            new_angles[-l-1][1] = np.dot(delta,dif_act)
+            dif_act = self.difunit3(0, self.angles[-l-1][0]+x[0],
+                                    self.angles[-l-1][1]+x[1],
+                                    self.angles[-l-1][2],psi)
+            new_angles[-l-1][2] = np.dot(delta,dif_act)
+        self.initialize()
+        return new_angles
+
+    def accuracy(self, data):
+        """Computes the classification accuracy.
+        Args.
+            data (array float): input data set.
+        Ret.
+            score (int): number of inputs correctly classified.
+        """
+        results = []
+        for (x,y) in zip(data[0],data[1]):
+            p0 = self.run(x,self.angles)
+            if p0<0.25: p=0
+            elif p0<0.5: p=1
+            elif p0<0.75: p=2
+            else: p=3
+            results.append([p,y])
+        score=sum(int(x==y) for (x,y) in results)
+        return score
