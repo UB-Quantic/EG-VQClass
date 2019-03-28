@@ -533,3 +533,26 @@ class QC(object):
             results.append([p,y])
         score=sum(int(x==y) for (x,y) in results)
         return score
+
+    ######################################
+    # Quantum Backpropagation v2
+    ######################################
+
+    def backpropagate2(self, x, y):
+        """Propose a new set of angles using a backpropagation algorithm.
+        Args.
+            x (dim=2 float): coordinates of input point.
+            y (dim=2 complex): desired output state for input point.
+        Ret.
+            new_angles (array float): proposal of new angles for one input.
+        """
+        new_angles = [np.zeris(a.shape) for a in self.angles]
+        #-----------------FeedForward----------
+        activations = [self.state.copy()]
+        for a in self.angles:
+            self.unitary(0,a[0],a[1],a[2])
+            activations.append(list(self.state))
+        self.initialize()
+        #-----------------Backward pass--------
+        # First step
+        delta = y 
