@@ -537,6 +537,86 @@ class QC(object):
     ######################################
     # Quantum Backpropagation v2
     ######################################
+    def run2(self, point, style=1):
+        """Runs the circuit and restores to the initial state.
+        Args.
+            point (dim=2 float): coordinates of input.
+            style (int): customizes the block.
+        Ret.
+            final_state (dim=2 float): wavefunction at the end.
+        """
+        for layer in self.angles:
+            self.block(0, point, layer, style)
+        final_state = self.state.copy()
+        self.initialize()
+        return final_state
+
+    def Cp2(self, point, label):
+        """Computes the cost value of a single input.
+        Args.
+            point(dim=2 float): coordinates of input point.
+            label(int): what class does point belong to.
+        Ret.
+            cp (float): cost value for a single input.
+        """
+        cp = np.dot(self.run2(point),label)
+        cp = np.conj(cp)*cp
+        return cp
+    def JISGD(self, training_data, epochs, mini_batch_size, learning_rate,
+               test_data):
+        """Train a variational circuit using Stochastic Gradient Descent.
+        Args.
+            training_data (array float): set of training input points.
+            epochs (int): number of learning epochs performed.
+            mini_batch_size (int): size of the learning batches.
+            learning_rate (float): distance moved on every step.
+            test_data (array float): set of test input points.
+        """
+        n = len(training_data)
+        if test_data:
+            test = []
+            n_test = len(test_data)
+            for i in range(n_test):
+                test.append([test_data[0][i],test_data[1][i]])
+
+# Debugging needed
+        for i in range(n):
+            training_data[1][i] = {
+                0: np.array([1,0], dtype=complex)
+                1: np.array([1/math.sqrt(3),math.sqrt(2/3)], dtype=complex)
+                2: np.array([1/math.sqrt(3),
+                             math.sqrt(2/3)*cmath.exp(2j*Pi/3)])
+                3:np.array([1/math.sqrt(3),
+                          math.sqrt(2/3)*cmath.exp(-2j*Pi/3)])
+            }.get(training_data[1][i],1)
+            print('train :', training_data[1][i][:n]
+
+        for j in range(epochs):
+            comb = list(zip(training_data[0],training_data[1]))
+            random.shuffle(comb)
+            mini_batches = [
+                training_data[k:k+mini_batch_size] for k in
+                range(0,n,mini_batch_size)
+            ]
+            for mini_batch in mini_batches:
+                self.update_mini_batch(mini_batch, learning_rate)
+            print('after epoch',j,'score is: ', self.accuracy(test_data))
+            print('\tcost = ',self.C(test_data,self.angles))
+            
+    def update_mini_batch2(self, mini_batch, learning_rate):
+        """Propose a new set of parameters for an input batch.
+        Args.
+            mini_batch (array float): set of input points.
+            learning_rate (float): distance moved along the gradient.
+        """
+        new_angles = [np.zeros(a.shape) for a in self.angles]
+
+        for x,y in zip(mini_batch[0], mini_batch[1]):
+            delta_new_angles = self.backpropagate2(x,y)
+            new_angles = [na + dna for na, dna in zip(new_angles,
+                                                      delta_new_angles)]
+        self.angles = [a - (learning_rate/len(mini_batch)) * na 
+                       for a, na in zip(self.angles, new_angles)]
 
     def backpropagate2(self, x, y):
         """Propose a new set of angles using a backpropagation algorithm.
@@ -546,13 +626,60 @@ class QC(object):
         Ret.
             new_angles (array float): proposal of new angles for one input.
         """
-        new_angles = [np.zeris(a.shape) for a in self.angles]
+        new_angles = [np.zeros(a.shape) for a in self.angles]
         #-----------------FeedForward----------
         activations = [self.state.copy()]
         for a in self.angles:
             self.unitary(0,a[0],a[1],a[2])
-            activations.append(list(self.state))
+            activations.append(self.state.copy())
+        fid = np.dot(np.conj(activations[-1]),y)
         self.initialize()
         #-----------------Backward pass--------
         # First step
-        delta = y 
+
+        # ENHANCEMENT:
+        # We should be coding this taking advantadge of the vector 
+        # nature of angles, activations, and all.
+        delta = y
+        dif_act = self.difunit1(0, self.angles[-1][0]+x[0],
+                               self.angles[-1][1]+x[1],
+                               self.angles[-1][2], activations[-2].copy())
+        new_angles[-1][0] = 2*(fid*np.dot(np.conj(delta),dif_act)).real
+        dif_act = self.difunit2(0, self.angles[-1][0]+x[0],
+                               self.angles[-1][1]+x[1],
+                               self.angles[-1][2], activations[-2].copy())
+        new_angles[-1][1] = 2*(fid*np.dot(np.conj(delta),dif_act)).real
+        dif_act = self.difunit3(0, self.angles[-1][0]+x[0],
+                               self.angles[-1][1]+x[1],
+                               self.angles[-1][2], activations[-2].copy())
+        new_angles[-1][2] = 2*(fid*np.dot(np.conj(delta),dif_act)).real
+        # Recursive steps
+        for l in range(1, self.depth):
+            delta = self.transunit(0, self.angles[-l][0]+x[0],
+                                   -self.angles[-l][1]-x[1],
+                                   -self.angles[-l][2], delta)
+            psi = activations[-l-2].copy()
+            dif_act = self.difunit1(0, self.angles[-l-1][0]+x[0],
+                                    self.angles[-l-1][1]+x[1],
+                                    self.angles[-l-1][2], psi)
+            new_angles[-l-1][0] = 2*(fid*np.dot(np.conj(delta),dif_act)).real
+            dif_act = self.difunit2(0, self.angles[-l-1][0]+x[0],
+                                    self.angles[-l-1][1]+x[1],
+                                    self.angles[-l-1][2], psi)
+            new_angles[-l-1][1] = 2*(fid*np.dot(np.conj(delta),dif_act)).real
+            dif_act = self.difunit3(0, self.angles[-l-1][0]+x[0],
+                                    self.angles[-l-1][1]+x[1],
+                                    self.angles[-l-1][2], psi)
+            new_angles[-l-1][2] = 2*(fid*np.dot(np.conj(delta),dif_act)).real
+
+
+        return new_angles
+
+import datagen
+
+training_data, test_data = datagen.read('../data/data3.txt', 50, 50)
+qlass = QC(1,1)
+qlass.JISGD(training_data, 30, 10, 1, test_data)
+#print('backprop 1: ', qlass.backpropagate([0.05,0.95],0))
+#print('backprop 2: ', qlass.backpropagate2([0.05,0.95],np.asarray([1,0])))
+#print('gradC : ', qlass.gradC([[[0.05,0.95]],[0]],qlass.angles,0.01))
