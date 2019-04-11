@@ -4,6 +4,9 @@ import cmath
 import random
 Pi = math.pi
 
+"-------------------------------------------"
+"GO TO THE END, ACCURACY2 UNDER CONSTRUCTION"
+"-------------------------------------------"
 
 class QC(object):
 
@@ -551,17 +554,32 @@ class QC(object):
         self.initialize()
         return final_state
 
-    def Cp2(self, point, label):
-        """Computes the cost value of a single input.
+    def fp(self, point, label):
+        """Computes the fidelity of a single input.
         Args.
             point(dim=2 float): coordinates of input point.
             label(int): what class does point belong to.
         Ret.
-            cp (float): cost value for a single input.
+            fp (float): fidelity for a single input.
         """
-        cp = np.dot(self.run2(point),label)
-        cp = np.conj(cp)*cp
-        return cp
+        fp = np.dot(self.run2(point),label)
+        fp = (np.conj(fp)*fp).real
+        return fp
+
+    def C2(self, data):
+        """Computes the cost function over thw whole data set.
+        Args.
+            data (array float): set of input points.
+        Ret.
+            cost (float): cost value for the entire set.
+        """
+        cost = 0
+        n = len(data[0])
+        for point, label in zip(data[0],data[1]):
+            cost+=self.fp(point,label)
+        cost/=n
+        return cost
+
     def JISGD(self, training_data, epochs, mini_batch_size, learning_rate,
                test_data):
         """Train a variational circuit using Stochastic Gradient Descent.
@@ -572,36 +590,49 @@ class QC(object):
             learning_rate (float): distance moved on every step.
             test_data (array float): set of test input points.
         """
-        n = len(training_data)
+        n = len(training_data[0])
+        sq3 = 1/math.sqrt(3)
+        sq23 = math.sqrt(2/3)
+        exp23 = cmath.exp(2j*Pi/3)
         if test_data:
+            new_test = []
             test = []
-            n_test = len(test_data)
+            n_test = len(test_data[0])
             for i in range(n_test):
-                test.append([test_data[0][i],test_data[1][i]])
+                if test_data[1][i] == 0:
+                    new_test.append([1,0])
+                elif test_data[1][i] == 1:
+                     new_test.append([sq3,sq23])
+                elif test_data[1][i] == 2:
+                   new_test.append([sq3,sq23*exp23])
+                elif test_data[1][i] == 3:
+                    new_test.append([sq3,sq23/exp23])
+                test.append([test_data[0][i],new_test[i]])
 
-# Debugging needed
+        # Debugging needed
+        new_labels = [] 
         for i in range(n):
-            training_data[1][i] = {
-                0: np.array([1,0], dtype=complex)
-                1: np.array([1/math.sqrt(3),math.sqrt(2/3)], dtype=complex)
-                2: np.array([1/math.sqrt(3),
-                             math.sqrt(2/3)*cmath.exp(2j*Pi/3)])
-                3:np.array([1/math.sqrt(3),
-                          math.sqrt(2/3)*cmath.exp(-2j*Pi/3)])
-            }.get(training_data[1][i],1)
-            print('train :', training_data[1][i][:n]
-
+            if training_data[1][i] == 0:
+                new_labels.append([1,0])
+            elif training_data[1][i] == 1:
+                new_labels.append([sq3,sq23])
+            elif training_data[1][i] == 2:
+                new_labels.append([sq3,sq23*exp23])
+            elif training_data[1][i] == 3:
+                new_labels.append([sq3,sq23/exp23])
+        
         for j in range(epochs):
-            comb = list(zip(training_data[0],training_data[1]))
+            comb = list(zip(training_data[0],new_labels))
             random.shuffle(comb)
+            
             mini_batches = [
-                training_data[k:k+mini_batch_size] for k in
+                comb[k:k+mini_batch_size] for k in
                 range(0,n,mini_batch_size)
             ]
             for mini_batch in mini_batches:
-                self.update_mini_batch(mini_batch, learning_rate)
-            print('after epoch',j,'score is: ', self.accuracy(test_data))
-            print('\tcost = ',self.C(test_data,self.angles))
+                self.update_mini_batch2(mini_batch, learning_rate)
+#            print('after epoch',j,'score is: ', self.accuracy(test_data))
+            print('\tcost = ',self.C2(test))
             
     def update_mini_batch2(self, mini_batch, learning_rate):
         """Propose a new set of parameters for an input batch.
@@ -615,7 +646,7 @@ class QC(object):
             delta_new_angles = self.backpropagate2(x,y)
             new_angles = [na + dna for na, dna in zip(new_angles,
                                                       delta_new_angles)]
-        self.angles = [a - (learning_rate/len(mini_batch)) * na 
+        self.angles = [a + (learning_rate/len(mini_batch)) * na 
                        for a, na in zip(self.angles, new_angles)]
 
     def backpropagate2(self, x, y):
@@ -627,14 +658,14 @@ class QC(object):
             new_angles (array float): proposal of new angles for one input.
         """
         new_angles = [np.zeros(a.shape) for a in self.angles]
-        #-----------------FeedForward----------
+        #-----------------FeedForward----------------
         activations = [self.state.copy()]
         for a in self.angles:
             self.unitary(0,a[0],a[1],a[2])
             activations.append(self.state.copy())
         fid = np.dot(np.conj(activations[-1]),y)
         self.initialize()
-        #-----------------Backward pass--------
+        #-----------------Backward pass--------------
         # First step
 
         # ENHANCEMENT:
@@ -675,11 +706,23 @@ class QC(object):
 
         return new_angles
 
+# Choose a way of classifying with the states!
+    def accuracy2(self, data):
+        """Computes the classification accuracy.
+        Args.
+            data (array float): input data set.
+        Ret.
+            score (int): number of inputs correctly classified.
+        """
+        results = []
+        for (x,y) in zip(data[0], data[1]):
+            psi = self.run2(x):
+
 import datagen
 
 training_data, test_data = datagen.read('../data/data3.txt', 50, 50)
 qlass = QC(1,1)
-qlass.JISGD(training_data, 30, 10, 1, test_data)
+qlass.JISGD(training_data, 30, 5, 0.5, test_data)
 #print('backprop 1: ', qlass.backpropagate([0.05,0.95],0))
 #print('backprop 2: ', qlass.backpropagate2([0.05,0.95],np.asarray([1,0])))
 #print('gradC : ', qlass.gradC([[[0.05,0.95]],[0]],qlass.angles,0.01))
